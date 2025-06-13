@@ -1,15 +1,16 @@
 const { ethers, config } = require("hardhat");
 require("dotenv").config();
 
-// Definisikan jaringan target deployment di sini
-const targetNetworks = ["Pharos", "Somnia", "OG"]; 
+// =============================================================
+// PUSAT KONTROL: TENTUKAN SEMUA JARINGAN TARGET DI SINI
+// =============================================================
+const targetNetworks = ["Somnia", "OG"]; 
 
 // =============================================================
-// FUNGSI HELPER UNTUK GENERATE DATA ACAK
+// FUNGSI HELPER UNTUK DATA ACAK
 // =============================================================
-
 function generateRandomString(length) {
-    const characters = 'ABCDEFGHIJKLMNOPQRSTUVWXYZabcdefghijklmnopqrstuvwxyz0123456789';
+    const characters = 'ABCDEFGHIJKLMNOPQRSTUVWXYZ0123456789';
     let result = '';
     for (let i = 0; i < length; i++) {
         result += characters.charAt(Math.floor(Math.random() * characters.length));
@@ -24,24 +25,23 @@ function generateRandomNumber(min, max) {
 // =============================================================
 // SCRIPT DEPLOYMENT UTAMA
 // =============================================================
-
 async function main() {
   const privateKey = process.env.PRIVATE_KEY;
   if (!privateKey) {
     throw new Error("⛔ Private Key tidak ditemukan di file .env");
   }
 
+  // Loop melalui setiap jaringan di dalam `targetNetworks`
   for (const networkName of targetNetworks) {
     
-    const randomName = `Project ${generateRandomString(8)}`;
-    const randomSymbol = generateRandomString(4).toUpperCase();
-    const randomSupply = generateRandomNumber(1000, 5000);
+    // Generate data acak baru untuk setiap deployment
+    const randomName = `Token ${generateRandomString(6)}`;
+    const randomSymbol = generateRandomString(3).toUpperCase();
+    const randomSupply = generateRandomNumber(500000, 2000000);
 
     console.log(`\n=================================================`);
     console.log(`🚀 Memulai deployment ke jaringan: ${networkName.toUpperCase()}`);
-    console.log(`   - Nama Acak: ${randomName}`);
-    console.log(`   - Simbol Acak: ${randomSymbol}`);
-    console.log(`   - Suplai Acak: ${randomSupply}`);
+    console.log(`   - Nama: ${randomName}, Simbol: ${randomSymbol}, Suplai: ${randomSupply}`);
     console.log(`=================================================`);
 
     try {
@@ -53,15 +53,15 @@ async function main() {
       
       const provider = new ethers.JsonRpcProvider(networkConfig.url);
       const signer = new ethers.Wallet(privateKey, provider);
-      const MyNFTFactory = await ethers.getContractFactory("MyNFT", signer);
+      const MyTokenFactory = await ethers.getContractFactory("MyToken", signer);
 
-      console.log(`📡 Mendeploy kontrak...`);
-      const myNFT = await MyNFTFactory.deploy(randomName, randomSymbol, randomSupply);
+      console.log(`📡 Mendeploy ${randomName}...`);
+      const token = await MyTokenFactory.deploy(randomName, randomSymbol, randomSupply);
       
-      await myNFT.waitForDeployment();
+      await token.waitForDeployment();
       
-      const contractAddress = await myNFT.getAddress();
-      console.log(`✅ Kontrak ${randomName} berhasil di-deploy di ${networkName.toUpperCase()} ke alamat: ${contractAddress}`);
+      const address = await token.getAddress();
+      console.log(`✅ Kontrak '${randomName}' berhasil di-deploy di ${networkName.toUpperCase()} ke alamat: ${address}`);
 
     } catch (error) {
       console.error(`❌ Gagal deploy ke jaringan ${networkName.toUpperCase()}:`);
@@ -71,7 +71,7 @@ async function main() {
 }
 
 main().catch((error) => {
-  console.error("❌ Terjadi error fatal selama proses deployment:");
+  console.error("❌ Terjadi error fatal selama proses deployment massal:");
   console.error(error);
-  process.exitCode = 1;
+  process.exit(1);
 });
