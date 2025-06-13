@@ -1,0 +1,26 @@
+{
+  "name": "nft-deploy-bot",
+  "version": "1.0.0",
+  "description": "Bot untuk auto-deploy kontrak NFT secara acak ke berbagai jaringan testnet.",
+  "main": "index.js",
+  "scripts": {
+    "deploy": "npx hardhat run scripts/deployToAll.js"
+  },
+  "keywords": [
+    "hardhat",
+    "solidity",
+    "nft",
+    "bot",
+    "ethereum"
+  ],
+  "author": "",
+  "license": "MIT",
+  "devDependencies": {
+    "@nomicfoundation/hardhat-toolbox": "^5.0.0",
+    "dotenv": "^16.4.5",
+    "hardhat": "^2.22.5"
+  },
+  "dependencies": {
+    "@openzeppelin/contracts": "^5.0.2"
+  }
+}
