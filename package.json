@@ -4,7 +4,8 @@
   "description": "Bot untuk auto-deploy kontrak NFT secara acak ke berbagai jaringan testnet.",
   "main": "index.js",
   "scripts": {
-    "deploy": "npx hardhat run scripts/deployToAll.js"
+  "deploy": "npx hardhat run scripts/deployToken.js",
+  "deploy:all": "npx hardhat run scripts/deployAllTokens.js"
   },
   "keywords": [
     "hardhat",
