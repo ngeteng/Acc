@@ -2,7 +2,7 @@ const { ethers, config } = require("hardhat");
 require("dotenv").config();
 
 // Definisikan jaringan target deployment di sini
-const targetNetworks = ["sepolia", "mumbai"]; 
+const targetNetworks = ["Pharos", "Somnia", "OG"]; 
 
 // =============================================================
 // FUNGSI HELPER UNTUK GENERATE DATA ACAK
