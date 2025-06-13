@@ -5,6 +5,7 @@ import "@openzeppelin/contracts/token/ERC721/ERC721.sol";
 import "@openzeppelin/contracts/access/Ownable.sol";
 
 contract MyNFT is ERC721, Ownable {
+    // Pastikan semua variabel state ada di sini, sebelum constructor
     private uint256 _nextTokenId;
     uint256 public immutable maxSupply;
 
