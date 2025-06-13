@@ -5,6 +5,12 @@ require("dotenv").config();
 module.exports = {
   solidity: "0.8.20",
   networks: {
+    Monad: {
+      url: process.env.Monad_RPC_URL || "",
+      accounts:
+        process.env.PRIVATE_KEY !== undefined ? [process.env.PRIVATE_KEY] : [],
+      chainId: 10143
+    },
     Somnia: {
       url: process.env.SOMNIA_RPC_URL || "",
       accounts:
