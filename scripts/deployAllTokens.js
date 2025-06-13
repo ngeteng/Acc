@@ -1,5 +1,6 @@
 const { ethers, config } = require("hardhat");
 require("dotenv").config();
+const { sendMessage } = require('./telegramReporter.js'); // Impor reporter kita
 
 // =============================================================
 // PUSAT KONTROL: TENTUKAN SEMUA JARINGAN TARGET DI SINI
@@ -45,27 +46,40 @@ async function main() {
     console.log(`=================================================`);
 
     try {
+      // Dapatkan konfigurasi jaringan dari hardhat.config.js
       const networkConfig = config.networks[networkName];
       if (!networkConfig) {
         console.warn(`⚠️ Konfigurasi untuk jaringan '${networkName}' tidak ditemukan. Melewati...`);
-        continue;
+        continue; 
       }
       
+      // Buat koneksi ke jaringan
       const provider = new ethers.JsonRpcProvider(networkConfig.url);
       const signer = new ethers.Wallet(privateKey, provider);
+      
+      // Dapatkan "pabrik" untuk kontrak kita
       const MyTokenFactory = await ethers.getContractFactory("MyToken", signer);
 
+      // Deploy kontrak dengan parameter acak
       console.log(`📡 Mendeploy ${randomName}...`);
       const token = await MyTokenFactory.deploy(randomName, randomSymbol, randomSupply);
       
+      // Tunggu sampai deployment selesai
       await token.waitForDeployment();
-      
       const address = await token.getAddress();
-      console.log(`✅ Kontrak '${randomName}' berhasil di-deploy di ${networkName.toUpperCase()} ke alamat: ${address}`);
+
+      // Buat pesan sukses dan kirim ke Telegram
+      const successMessage = `✅ Deployment *SUKSES* di _${networkName.toUpperCase()}_\n\n*Token*: ${randomName} (${randomSymbol})\n*Suplai Awal*: ${randomSupply.toLocaleString()}\n\n*Alamat*: \`${address}\``;
+      
+      console.log(`✅ Kontrak '${randomName}' berhasil di-deploy.`);
+      await sendMessage(successMessage);
 
     } catch (error) {
+      // Jika terjadi error, buat pesan gagal dan kirim ke Telegram
+      const failureMessage = `❌ Deployment *GAGAL* di _${networkName.toUpperCase()}_\n\n*Percobaan untuk*: ${randomName}\n\n*Error*: \`${error.message.substring(0, 250)}...\``;
+
       console.error(`❌ Gagal deploy ke jaringan ${networkName.toUpperCase()}:`);
-      console.error(error);
+      await sendMessage(failureMessage);
     }
   }
 }
