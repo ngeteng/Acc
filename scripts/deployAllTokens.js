@@ -5,7 +5,20 @@ const { sendMessage } = require('./telegramReporter.js'); // Impor reporter kita
 // =============================================================
 // PUSAT KONTROL: TENTUKAN SEMUA JARINGAN TARGET DI SINI
 // =============================================================
-const targetNetworks = ["Somnia", "OG"]; 
+const targetNetworks = ["Somnia", "OG"];
+// =============================================================
+// FUNGSI HELPER
+// =============================================================
+
+function generateRandomString(length) { /* ... */ }
+
+function generateRandomNumber(min, max) { /* ... */ }
+
+// TAMBAHKAN FUNGSI BARU INI
+function shortenAddress(address) {
+    if (!address) return "";
+    return `${address.slice(0, 6)}...${address.slice(address.length - 4)}`;
+}
 
 // =============================================================
 // FUNGSI HELPER UNTUK DATA ACAK
@@ -68,9 +81,8 @@ async function main() {
       await token.waitForDeployment();
       const address = await token.getAddress();
 
-      // Buat pesan sukses dan kirim ke Telegram
-      const successMessage = `✅ Deployment *SUKSES* di _${networkName.toUpperCase()}_\n\n*Token*: ${randomName} (${randomSymbol})\n*Suplai Awal*: ${randomSupply.toLocaleString()}\n\n*Alamat*: \`${address}\``;
-      
+      const shortAddress = shortenAddress(address);
+      const successMessage = `✅ Deployment *SUKSES* di _${networkName.toUpperCase()}_\n\n*Token*: ${randomName} (${randomSymbol})\n*Suplai Awal*: ${randomSupply.toLocaleString()}\n\n*Alamat*: \`${shortAddress}\``;
       console.log(`✅ Kontrak '${randomName}' berhasil di-deploy.`);
       await sendMessage(successMessage);
 
