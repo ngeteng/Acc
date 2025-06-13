@@ -6,19 +6,21 @@ module.exports = {
   solidity: "0.8.20",
   networks: {
     sepolia: {
-      url: process.env.SEPOLIA_RPC_URL || "",
+      url: process.env.PHAROS_RPC_URL || "",
       accounts:
         process.env.PRIVATE_KEY !== undefined ? [process.env.PRIVATE_KEY] : [],
+      chainId: 688688
     },
     mumbai: {
-      url: process.env.MUMBAI_RPC_URL || "",
+      url: process.env.SOMNIA_RPC_URL || "",
       accounts:
         process.env.PRIVATE_KEY !== undefined ? [process.env.PRIVATE_KEY] : [],
+      chainId: 50312
     },
-     ogTestnet: {
-       url: "https://rpc-testnet.0g.ai",
+     OG: {
+       url: process.env.OG_RPC_URL,
        accounts: process.env.PRIVATE_KEY !== undefined ? [process.env.PRIVATE_KEY] : [],
-       chainId: 16600
+       chainId: 16601
      }
   },
 };
