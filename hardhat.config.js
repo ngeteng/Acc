@@ -9,7 +9,7 @@ module.exports = {
       url: process.env.MONAD_RPC_URL || "",
       accounts:
         process.env.PRIVATE_KEY !== undefined ? [process.env.PRIVATE_KEY] : [],
-      chainId: 10143
+      chainId: 688688
     },
     Somnia: {
       url: process.env.SOMNIA_RPC_URL || "",
