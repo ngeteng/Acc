@@ -5,7 +5,7 @@ const { sendMessage } = require('./telegramReporter.js'); // Impor reporter kita
 // =============================================================
 // PUSAT KONTROL: TENTUKAN SEMUA JARINGAN TARGET DI SINI
 // =============================================================
-const targetNetworks = ["Pharos", "Somnia", "OG"];
+const targetNetworks = ["Pharos", "Somnia", "Xos", "OG"];
 // =============================================================
 // FUNGSI HELPER
 // =============================================================
