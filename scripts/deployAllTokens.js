@@ -1,115 +1,78 @@
-const { ethers, config } = require("hardhat");
+const { ethers, hre } = require("hardhat"); // Tambahkan hre untuk akses info jaringan
 require("dotenv").config();
 const { sendMessage } = require('./telegramReporter.js');
 
-// =============================================================
-// PUSAT KONTROL
-// =============================================================
-const targetNetworks = ["Pharos", "Somnia", "OG"]; 
-
-// =============================================================
-// FUNGSI HELPER (Tidak ada perubahan di sini)
-// =============================================================
-function generateRandomString(length) {
-    const characters = 'ABCDEFGHIJKLMNOPQRSTUVWXYZ0123456789';
-    let result = '';
-    for (let i = 0; i < length; i++) {
-        result += characters.charAt(Math.floor(Math.random() * characters.length));
-    }
-    return result;
-}
-
-function generateRandomNumber(min, max) {
-    return Math.floor(Math.random() * (max - min + 1)) + min;
-}
-
+// Helper function untuk memotong alamat
 function shortenAddress(address) {
     if (!address) return "";
     return `${address.slice(0, 6)}...${address.slice(address.length - 4)}`;
 }
 
-// =============================================================
-// SCRIPT DEPLOYMENT UTAMA
-// =============================================================
 async function main() {
-  const deployerPrivateKey = process.env.PRIVATE_KEY;
-  const thirdPartyPrivateKey = process.env.THIRD_PARTY_PRIVATE_KEY;
-
-  if (!deployerPrivateKey) {
-    throw new Error("⛔ PRIVATE_KEY (deployer) tidak ditemukan di file .env");
-  }
-  if (!thirdPartyPrivateKey) {
-    console.warn("⚠️ THIRD_PARTY_PRIVATE_KEY tidak ditemukan, simulasi approve/transferFrom akan dilewati.");
-  }
-
-  for (const networkName of targetNetworks) {
-    const randomName = `Token ${generateRandomString(6)}`;
-    const randomSymbol = generateRandomString(3).toUpperCase();
-    const randomSupply = generateRandomNumber(500000, 2000000);
+    const [deployer] = await ethers.getSigners();
+    const networkName = hre.network.name;
 
     console.log(`\n=================================================`);
-    console.log(`🚀 Memulai deployment & simulasi ke jaringan: ${networkName.toUpperCase()}`);
-    console.log(`   - Token: ${randomName} (${randomSymbol})`);
+    console.log(`🚀 Memulai deployment EKOSISTEM MINI di ${networkName.toUpperCase()}`);
+    console.log(`   - Deployer: ${deployer.address}`);
     console.log(`=================================================`);
 
     try {
-      const networkConfig = config.networks[networkName];
-      if (!networkConfig) {
-        console.warn(`⚠️ Konfigurasi untuk jaringan '${networkName}' tidak ditemukan. Melewati...`);
-        continue;
-      }
-      
-      const provider = new ethers.JsonRpcProvider(networkConfig.url);
-      
-      // Buat DUA signer: satu untuk deployer, satu untuk pihak ketiga
-      const deployerSigner = new ethers.Wallet(deployerPrivateKey, provider);
-      const thirdPartySigner = thirdPartyPrivateKey ? new ethers.Wallet(thirdPartyPrivateKey, provider) : null;
+        // =============================================================
+        // LANGKAH 1: DEPLOY TOKEN ERC20
+        // =============================================================
+        console.log("[1/4] 📡 Mendeploy kontrak token (MyToken)...");
+        const tokenSupply = ethers.parseUnits("1000000", 18); // 1 Juta token
+        const MyTokenFactory = await ethers.getContractFactory("MyToken", deployer);
+        const token = await MyTokenFactory.deploy("Ecosystem Token", "ECO", tokenSupply);
+        await token.waitForDeployment();
+        const tokenAddress = await token.getAddress();
+        console.log(`✔  MyToken berhasil di-deploy ke: ${tokenAddress}`);
 
-      const MyTokenFactory = await ethers.getContractFactory("MyToken", deployerSigner);
+        // =============================================================
+        // LANGKAH 2: DEPLOY KONTRAK VAULT
+        // =============================================================
+        console.log("\n[2/4] 🏦 Mendeploy kontrak vault (StakingVault)...");
+        const StakingVaultFactory = await ethers.getContractFactory("StakingVault", deployer);
+        // Berikan alamat token kita ke constructor vault
+        const vault = await StakingVaultFactory.deploy(tokenAddress);
+        await vault.waitForDeployment();
+        const vaultAddress = await vault.getAddress();
+        console.log(`✔  StakingVault berhasil di-deploy ke: ${vaultAddress}`);
 
-      // 1. DEPLOY KONTRAK
-      console.log(`[1/3] 📡 Mendeploy ${randomName}...`);
-      const token = await MyTokenFactory.deploy(randomName, randomSymbol, randomSupply);
-      await token.waitForDeployment();
-      const address = await token.getAddress();
-      console.log(`✔  Kontrak ter-deploy di: ${address}`);
+        // =============================================================
+        // LANGKAH 3: INTERAKSI - APPROVE
+        // =============================================================
+        const amountToStake = ethers.parseUnits("5000", 18); // Kita akan stake 5,000 token
+        console.log(`\n[3/4] 👍 Memberi izin (approve) kepada Vault untuk memindahkan 5,000 ECO...`);
+        const approveTx = await token.approve(vaultAddress, amountToStake);
+        await approveTx.wait();
+        console.log(`✔  Approve berhasil.`);
 
-      // 2. LOGIKA SIMULASI APPROVE & TRANSFERFROM
-      if (thirdPartySigner) {
-          const amountToSimulate = generateRandomNumber(100, 1000).toString();
-          const amountInSmallestUnit = ethers.parseUnits(amountToSimulate, 18);
-          
-          // 2a. DEPLOYER MELAKUKAN APPROVE
-          console.log(`[2/3] 👍 Deployer memberi izin (approve) kepada ${shortenAddress(thirdPartySigner.address)}...`);
-          const approveTx = await token.connect(deployerSigner).approve(thirdPartySigner.address, amountInSmallestUnit);
-          await approveTx.wait();
-          console.log(`✔  Izin berhasil diberikan.`);
+        // =============================================================
+        // LANGKAH 4: INTERAKSI - STAKE
+        // =============================================================
+        console.log("\n[4/4] 🥩 Melakukan staking 5,000 ECO ke dalam Vault...");
+        const stakeTx = await vault.stake(amountToStake);
+        await stakeTx.wait();
+        console.log("✔  Staking berhasil!");
 
-          // 2b. PIHAK KETIGA MELAKUKAN TRANSFERFROM
-          console.log(`[3/3] 🤝 Pihak ketiga (${shortenAddress(thirdPartySigner.address)}) memindahkan (transferFrom) token...`);
-          const recipientForTransfer = process.env.RECIPIENT_ADDRESS || deployerSigner.address; // Kirim ke RECIPIENT_ADDRESS atau kembali ke deployer
-          const transferFromTx = await token.connect(thirdPartySigner).transferFrom(deployerSigner.address, recipientForTransfer, amountInSmallestUnit);
-          await transferFromTx.wait();
-          console.log(`✔  Berhasil memindahkan ${amountToSimulate} ${randomSymbol}.`);
-
-          // Kirim laporan sukses lengkap ke Telegram
-          const successMessage = `✅ Simulasi *SUKSES* di _${networkName.toUpperCase()}_\n\n*Token*: ${randomName} (${randomSymbol})\n*Alamat*: \`${shortenAddress(address)}\`\n\n*Interaksi*: \`approve\` & \`transferFrom\` sejumlah *${amountToSimulate} ${randomSymbol}* berhasil disimulasikan!`;
-          await sendMessage(successMessage);
-      } else {
-          // Fallback jika tidak ada pihak ketiga
-          const successMessage = `✅ Deployment *SUKSES* (tanpa simulasi) di _${networkName.toUpperCase()}_\n\n*Token*: ${randomName} (${randomSymbol})\n*Alamat*: \`${shortenAddress(address)}\``;
-          await sendMessage(successMessage);
-      }
+        // =============================================================
+        // LAPORAN KE TELEGRAM
+        // =============================================================
+        console.log("\n✅ EKOSISTEM MINI BERHASIL DIBANGUN DAN BERINTERAKSI!");
+        const successMessage = `✅ Ekosistem Mini *SUKSES* di _${networkName.toUpperCase()}_\n\n*Token (ECO)*: \`${shortenAddress(tokenAddress)}\`\n*Vault*: \`${shortenAddress(vaultAddress)}\`\n\n*Aksi*: Berhasil deploy 2 kontrak & stake *5,000 ECO* ke dalam vault!`;
+        await sendMessage(successMessage);
 
     } catch (error) {
-        const failureMessage = `❌ Proses *GAGAL* di _${networkName.toUpperCase()}_\n\n*Percobaan untuk*: ${randomName}\n\n*Error*: \`${error.message.substring(0, 250)}...\``;
-        console.error(`❌ Gagal pada proses di jaringan ${networkName.toUpperCase()}:`, error);
+        console.error("❌ Pembangunan Ekosistem GAGAL:", error);
+        const failureMessage = `❌ Pembangunan Ekosistem *GAGAL* di _${networkName.toUpperCase()}_\n\n*Error*: \`${error.message}\``;
         await sendMessage(failureMessage);
+        process.exit(1);
     }
-  }
 }
 
 main().catch((error) => {
-    console.error("❌ Terjadi error fatal pada skrip utama:", error);
-    process.exit(1);
+    console.error(error);
+    process.exitCode = 1;
 });
