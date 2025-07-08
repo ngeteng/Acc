@@ -1,4 +1,4 @@
-const { ethers, config, hre } = require("hardhat");
+const { ethers, config } = require("hardhat");
 require("dotenv").config();
 const { sendMessage } = require('./telegramReporter.js');
 
@@ -46,13 +46,7 @@ async function main() {
     console.log(`=================================================`);
 
     try {
-      const networkConfig = config.networks[networkName];
-      if (!networkConfig) {
-        console.warn(`⚠️  Konfigurasi untuk jaringan '${networkName}' tidak ditemukan. Melewati...`);
-        continue;
-      }
-
-      const provider = new ethers.JsonRpcProvider(networkConfig.url);
+      const provider = new ethers.JsonRpcProvider(config.networks[networkName].url);
       const signer = new ethers.Wallet(privateKey, provider);
       
       const randomName = `Token ${generateRandomString(6)}`;
@@ -62,7 +56,7 @@ async function main() {
       console.log(`   - Token Dibuat: ${randomName} (${randomSymbol})`);
 
       // 1. DEPLOY TOKEN
-      console.log("   - [1/4] Mendeploy MyToken...");
+      console.log("   - [1/5] Mendeploy MyToken...");
       const tokenFactory = await ethers.getContractFactory("MyToken", signer);
       const token = await tokenFactory.deploy(randomName, randomSymbol, randomSupplyInSmallestUnit);
       await token.waitForDeployment();
@@ -70,7 +64,7 @@ async function main() {
       console.log(`✔  MyToken ter-deploy di: ${tokenAddress}`);
 
       // 2. DEPLOY VAULT
-      console.log("   - [2/4] Mendeploy StakingVault...");
+      console.log("   - [2/5] Mendeploy StakingVault...");
       const vaultFactory = await ethers.getContractFactory("StakingVault", signer);
       const vault = await vaultFactory.deploy(tokenAddress);
       await vault.waitForDeployment();
@@ -79,25 +73,34 @@ async function main() {
 
       // 3. INTERAKSI - APPROVE
       const amountToStake = ethers.parseUnits("5000", 18);
-      console.log("   - [3/4] Melakukan Approve...");
+      console.log("   - [3/5] Melakukan Approve...");
       const approveTx = await token.approve(vaultAddress, amountToStake);
       await approveTx.wait();
       console.log(`✔  Approve berhasil.`);
 
-      // --- JEDA WAKTU UNTUK SINKRONISASI JARINGAN ---
+      // JEDA WAKTU
       const delaySeconds = 15;
-      console.log(`   - Memberi jeda ${delaySeconds} detik untuk sinkronisasi jaringan...`);
+      console.log(`   - Memberi jeda ${delaySeconds} detik...`);
       await new Promise(resolve => setTimeout(resolve, delaySeconds * 1000));
-      // ---------------------------------------------
 
       // 4. INTERAKSI - STAKE
-      console.log("   - [4/4] Melakukan Stake...");
+      console.log("   - [4/5] Melakukan Stake...");
       const stakeTx = await vault.stake(amountToStake);
       await stakeTx.wait();
       console.log("✔  Staking berhasil!");
+
+      // 5. INTERAKSI - KIRIM TOKEN
+      const recipient = process.env.RECIPIENT_ADDRESS;
+      if (recipient) {
+        const amountToSend = ethers.parseUnits(generateRandomNumber(1, 100).toString(), 18);
+        console.log(`   - [5/5] Mengirim token ke penerima...`);
+        const transferTx = await token.transfer(recipient, amountToSend);
+        await transferTx.wait();
+        console.log(`✔  Berhasil mengirim ${ethers.formatUnits(amountToSend, 18)} ${randomSymbol} ke ${shortenAddress(recipient)}`);
+      }
       
       console.log(`✔  Proses di jaringan ${networkName.toUpperCase()} SUKSES.`);
-      deploymentResults.push(`✅ *${networkName.toUpperCase()}*: SUKSES!\n   - Token: *${randomName}*\n   - Alamat: \`${shortenAddress(tokenAddress)}\``);
+      deploymentResults.push(`✅ *${networkName.toUpperCase()}*: SUKSES!\n   - Token: *${randomName}* \`${shortenAddress(tokenAddress)}\`\n   - Aksi: Deploy, Stake, & Kirim`);
 
     } catch (error) {
       console.error(`❌ Proses GAGAL di jaringan ${networkName.toUpperCase()}:`, error.message);
