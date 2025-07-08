@@ -3,13 +3,26 @@ require("dotenv").config();
 const { sendMessage } = require('./telegramReporter.js');
 
 // =============================================================
-// PUSAT KONTROL: TENTUKAN SEMUA JARINGAN TARGET DI SINI
+// KONFIGURASI
 // =============================================================
 const targetNetworks = ["Pharos", "Somnia", "OG"];
 
 // =============================================================
 // FUNGSI HELPER
 // =============================================================
+function generateRandomString(length) {
+    const characters = 'ABCDEFGHIJKLMNOPQRSTUVWXYZ0123456789';
+    let result = '';
+    for (let i = 0; i < length; i++) {
+        result += characters.charAt(Math.floor(Math.random() * characters.length));
+    }
+    return result;
+}
+
+function generateRandomNumber(min, max) {
+    return Math.floor(Math.random() * (max - min + 1)) + min;
+}
+
 function shortenAddress(address) {
     if (!address) return "";
     return `${address.slice(0, 6)}...${address.slice(address.length - 4)}`;
@@ -20,66 +33,75 @@ function shortenAddress(address) {
 // =============================================================
 async function main() {
   const privateKey = process.env.PRIVATE_KEY;
-  if (!privateKey) {
-    throw new Error("⛔ PRIVATE_KEY tidak ditemukan di file .env");
-  }
+  if (!privateKey) { throw new Error("⛔ PRIVATE_KEY tidak ditemukan di file .env"); }
 
-  // Loop utama untuk setiap jaringan target
+  const deploymentResults = [];
+  const startTime = new Date();
+  
+  console.log(`\n🚀 Memulai deployment massal ke ${targetNetworks.length} jaringan...`);
+
   for (const networkName of targetNetworks) {
-    console.log(`\n\n=================================================`);
-    console.log(`🚀 Memulai proses di jaringan: ${networkName.toUpperCase()}`);
+    console.log(`\n=================================================`);
+    console.log(`- Memproses jaringan: ${networkName.toUpperCase()}`);
     console.log(`=================================================`);
 
     try {
-      // 1. SETUP KONEKSI UNTUK JARINGAN SAAT INI
-      const networkConfig = config.networks[networkName];
-      if (!networkConfig) {
-        console.warn(`⚠️  Konfigurasi untuk jaringan '${networkName}' tidak ditemukan. Melewati...`);
-        continue;
-      }
-      const provider = new ethers.JsonRpcProvider(networkConfig.url);
+      const provider = new ethers.JsonRpcProvider(config.networks[networkName].url);
       const signer = new ethers.Wallet(privateKey, provider);
+      
+      // ---- GENERATE PARAMETER ACAK ----
+      const randomName = `Token ${generateRandomString(6)}`;
+      const randomSymbol = generateRandomString(3).toUpperCase();
+      const randomSupply = generateRandomNumber(500000, 2000000);
+      const randomSupplyInSmallestUnit = ethers.parseUnits(randomSupply.toString(), 18);
+      console.log(`   - Token Dibuat: ${randomName} (${randomSymbol})`);
+      // ---------------------------------
 
-      console.log(`   - Menggunakan wallet: ${signer.address}`);
-
-      // 2. DEPLOY TOKEN
-      console.log("[1/4] 📡 Mendeploy kontrak token (MyToken)...");
+      // 1. DEPLOY TOKEN DENGAN PARAMETER ACAK
+      console.log("   - [1/4] Mendeploy MyToken...");
       const tokenFactory = await ethers.getContractFactory("MyToken", signer);
-      const token = await tokenFactory.deploy("Ecosystem Token", "ECO", ethers.parseUnits("1000000", 18));
+      const token = await tokenFactory.deploy(randomName, randomSymbol, randomSupplyInSmallestUnit);
       await token.waitForDeployment();
       const tokenAddress = await token.getAddress();
-      console.log(`✔  MyToken berhasil di-deploy ke: ${tokenAddress}`);
+      console.log(`✔  MyToken ter-deploy di: ${tokenAddress}`);
 
-      // 3. DEPLOY VAULT
-      console.log("\n[2/4] 🏦 Mendeploy kontrak vault (StakingVault)...");
+      // 2. DEPLOY VAULT
+      console.log("   - [2/4] Mendeploy StakingVault...");
       const vaultFactory = await ethers.getContractFactory("StakingVault", signer);
       const vault = await vaultFactory.deploy(tokenAddress);
       await vault.waitForDeployment();
       const vaultAddress = await vault.getAddress();
-      console.log(`✔  StakingVault berhasil di-deploy ke: ${vaultAddress}`);
+      console.log(`✔  StakingVault ter-deploy di: ${vaultAddress}`);
 
-      // 4. LAKUKAN INTERAKSI
+      // 3. & 4. INTERAKSI (APPROVE & STAKE)
       const amountToStake = ethers.parseUnits("5000", 18);
-      console.log(`\n[3/4] 👍 Memberi izin (approve) kepada Vault...`);
-      const approveTx = await token.approve(vaultAddress, amountToStake);
-      await approveTx.wait();
-      console.log(`✔  Approve berhasil.`);
-
-      console.log("\n[4/4] 🥩 Melakukan staking ke Vault...");
-      const stakeTx = await vault.stake(amountToStake);
-      await stakeTx.wait();
-      console.log("✔  Staking berhasil!");
-
-      // Kirim laporan sukses ke Telegram
-      const successMessage = `✅ Ekosistem Mini *SUKSES* di _${networkName.toUpperCase()}_\n\n*Token (ECO)*: \`${shortenAddress(tokenAddress)}\`\n*Vault*: \`${shortenAddress(vaultAddress)}\`\n\n*Aksi*: Deploy 2 kontrak & stake *5,000 ECO* berhasil!`;
-      await sendMessage(successMessage);
+      console.log("   - [3/4] Melakukan Approve...");
+      await token.approve(vaultAddress, amountToStake);
+      console.log("   - [4/4] Melakukan Stake...");
+      await vault.stake(amountToStake);
+      
+      console.log(`✔  Proses di jaringan ${networkName.toUpperCase()} SUKSES.`);
+      deploymentResults.push(`✅ *${networkName.toUpperCase()}*: SUKSES!\n   - Token: *${randomName}*\n   - Alamat: \`${shortenAddress(tokenAddress)}\``);
 
     } catch (error) {
-      console.error(`❌ Pembangunan Ekosistem GAGAL di jaringan ${networkName.toUpperCase()}:`, error);
-      const failureMessage = `❌ Pembangunan Ekosistem *GAGAL* di _${networkName.toUpperCase()}_\n\n*Error*: \`${error.message}\``;
-      await sendMessage(failureMessage);
+      console.error(`❌ Proses GAGAL di jaringan ${networkName.toUpperCase()}:`, error.message);
+      deploymentResults.push(`❌ *${networkName.toUpperCase()}*: GAGAL!\n   - Error: \`${error.message.substring(0, 50)}...\``);
     }
   }
+
+  // MEMBUAT & MENGIRIM LAPORAN RANGKUMAN
+  console.log("\n=================================================");
+  console.log("🏁 Semua proses selesai. Membuat laporan rangkuman...");
+  const endTime = new Date();
+  const duration = ((endTime - startTime) / 1000).toFixed(2);
+
+  let summaryMessage = `*Laporan Rangkuman Deployment Bot*\n\n`;
+  summaryMessage += `*Durasi Total*: ${duration} detik\n\n`;
+  summaryMessage += `*Hasil Per Jaringan:*\n`;
+  summaryMessage += deploymentResults.join('\n\n');
+
+  await sendMessage(summaryMessage);
+  console.log("Laporan rangkuman akhir telah dikirim ke Telegram.");
 }
 
 main().catch((error) => {
