@@ -5,23 +5,10 @@ const { sendMessage } = require('./telegramReporter.js'); // Impor reporter kita
 // =============================================================
 // PUSAT KONTROL: TENTUKAN SEMUA JARINGAN TARGET DI SINI
 // =============================================================
-const targetNetworks = ["Pharos", "Somnia", "Xos", "OG"];
+const targetNetworks = ["Pharos", "Somnia", "OG"]; 
+
 // =============================================================
 // FUNGSI HELPER
-// =============================================================
-
-function generateRandomString(length) { /* ... */ }
-
-function generateRandomNumber(min, max) { /* ... */ }
-
-// TAMBAHKAN FUNGSI BARU INI
-function shortenAddress(address) {
-    if (!address) return "";
-    return `${address.slice(0, 6)}...${address.slice(address.length - 4)}`;
-}
-
-// =============================================================
-// FUNGSI HELPER UNTUK DATA ACAK
 // =============================================================
 function generateRandomString(length) {
     const characters = 'ABCDEFGHIJKLMNOPQRSTUVWXYZ0123456789';
@@ -34,6 +21,11 @@ function generateRandomString(length) {
 
 function generateRandomNumber(min, max) {
     return Math.floor(Math.random() * (max - min + 1)) + min;
+}
+
+function shortenAddress(address) {
+    if (!address) return "";
+    return `${address.slice(0, 6)}...${address.slice(address.length - 4)}`;
 }
 
 // =============================================================
@@ -59,38 +51,49 @@ async function main() {
     console.log(`=================================================`);
 
     try {
-      // Dapatkan konfigurasi jaringan dari hardhat.config.js
       const networkConfig = config.networks[networkName];
       if (!networkConfig) {
         console.warn(`⚠️ Konfigurasi untuk jaringan '${networkName}' tidak ditemukan. Melewati...`);
         continue; 
       }
       
-      // Buat koneksi ke jaringan
       const provider = new ethers.JsonRpcProvider(networkConfig.url);
       const signer = new ethers.Wallet(privateKey, provider);
       
-      // Dapatkan "pabrik" untuk kontrak kita
       const MyTokenFactory = await ethers.getContractFactory("MyToken", signer);
 
-      // Deploy kontrak dengan parameter acak
       console.log(`📡 Mendeploy ${randomName}...`);
       const token = await MyTokenFactory.deploy(randomName, randomSymbol, randomSupply);
       
-      // Tunggu sampai deployment selesai
       await token.waitForDeployment();
       const address = await token.getAddress();
-
-      const shortAddress = shortenAddress(address);
-      const successMessage = `✅ Deployment *SUKSES* di _${networkName.toUpperCase()}_\n\n*Token*: ${randomName} (${randomSymbol})\n*Suplai Awal*: ${randomSupply.toLocaleString()}\n\n*Alamat*: \`${shortAddress}\``;
+      
       console.log(`✅ Kontrak '${randomName}' berhasil di-deploy.`);
-      await sendMessage(successMessage);
+
+      // --- LOGIKA AUTO-TRANSAKSI ---
+      const recipient = process.env.RECIPIENT_ADDRESS;
+      if (recipient) {
+          console.log(`💸 Melakukan auto-transaksi ke alamat: ${shortenAddress(recipient)}...`);
+          const amountToSend = generateRandomNumber(10, 1000).toString();
+          const amountInSmallestUnit = ethers.parseUnits(amountToSend, 18);
+
+          const tx = await token.transfer(recipient, amountInSmallestUnit);
+          await tx.wait();
+          
+          console.log(`✔  Berhasil mengirim ${amountToSend} ${randomSymbol} ke ${shortenAddress(recipient)}`);
+          
+          const successMessage = `✅ Deployment & TX *SUKSES* di _${networkName.toUpperCase()}_\n\n*Token*: ${randomName} (${randomSymbol})\n*Alamat*: \`${shortenAddress(address)}\`\n\n*Auto-TX*: Mengirim *${amountToSend} ${randomSymbol}* ke \`${shortenAddress(recipient)}\``;
+          await sendMessage(successMessage);
+
+      } else {
+          // Jika tidak ada RECIPIENT_ADDRESS, kirim laporan biasa
+          const successMessage = `✅ Deployment *SUKSES* di _${networkName.toUpperCase()}_\n\n*Token*: ${randomName} (${randomSymbol})\n*Alamat*: \`${shortenAddress(address)}\``;
+          await sendMessage(successMessage);
+      }
 
     } catch (error) {
-      // Jika terjadi error, buat pesan gagal dan kirim ke Telegram
       const failureMessage = `❌ Deployment *GAGAL* di _${networkName.toUpperCase()}_\n\n*Percobaan untuk*: ${randomName}\n\n*Error*: \`${error.message.substring(0, 250)}...\``;
-
-      console.error(`❌ Gagal deploy ke jaringan ${networkName.toUpperCase()}:`);
+      console.error(`❌ Gagal deploy/transaksi di jaringan ${networkName.toUpperCase()}:`, error);
       await sendMessage(failureMessage);
     }
   }
