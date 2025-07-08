@@ -1,14 +1,14 @@
 const { ethers, config } = require("hardhat");
 require("dotenv").config();
-const { sendMessage } = require('./telegramReporter.js'); // Impor reporter kita
+const { sendMessage } = require('./telegramReporter.js');
 
 // =============================================================
-// PUSAT KONTROL: TENTUKAN SEMUA JARINGAN TARGET DI SINI
+// PUSAT KONTROL
 // =============================================================
 const targetNetworks = ["Pharos", "Somnia", "OG"]; 
 
 // =============================================================
-// FUNGSI HELPER
+// FUNGSI HELPER (Tidak ada perubahan di sini)
 // =============================================================
 function generateRandomString(length) {
     const characters = 'ABCDEFGHIJKLMNOPQRSTUVWXYZ0123456789';
@@ -32,75 +32,84 @@ function shortenAddress(address) {
 // SCRIPT DEPLOYMENT UTAMA
 // =============================================================
 async function main() {
-  const privateKey = process.env.PRIVATE_KEY;
-  if (!privateKey) {
-    throw new Error("⛔ Private Key tidak ditemukan di file .env");
+  const deployerPrivateKey = process.env.PRIVATE_KEY;
+  const thirdPartyPrivateKey = process.env.THIRD_PARTY_PRIVATE_KEY;
+
+  if (!deployerPrivateKey) {
+    throw new Error("⛔ PRIVATE_KEY (deployer) tidak ditemukan di file .env");
+  }
+  if (!thirdPartyPrivateKey) {
+    console.warn("⚠️ THIRD_PARTY_PRIVATE_KEY tidak ditemukan, simulasi approve/transferFrom akan dilewati.");
   }
 
-  // Loop melalui setiap jaringan di dalam `targetNetworks`
   for (const networkName of targetNetworks) {
-    
-    // Generate data acak baru untuk setiap deployment
     const randomName = `Token ${generateRandomString(6)}`;
     const randomSymbol = generateRandomString(3).toUpperCase();
     const randomSupply = generateRandomNumber(500000, 2000000);
 
     console.log(`\n=================================================`);
-    console.log(`🚀 Memulai deployment ke jaringan: ${networkName.toUpperCase()}`);
-    console.log(`   - Nama: ${randomName}, Simbol: ${randomSymbol}, Suplai: ${randomSupply}`);
+    console.log(`🚀 Memulai deployment & simulasi ke jaringan: ${networkName.toUpperCase()}`);
+    console.log(`   - Token: ${randomName} (${randomSymbol})`);
     console.log(`=================================================`);
 
     try {
       const networkConfig = config.networks[networkName];
       if (!networkConfig) {
         console.warn(`⚠️ Konfigurasi untuk jaringan '${networkName}' tidak ditemukan. Melewati...`);
-        continue; 
+        continue;
       }
       
       const provider = new ethers.JsonRpcProvider(networkConfig.url);
-      const signer = new ethers.Wallet(privateKey, provider);
       
-      const MyTokenFactory = await ethers.getContractFactory("MyToken", signer);
+      // Buat DUA signer: satu untuk deployer, satu untuk pihak ketiga
+      const deployerSigner = new ethers.Wallet(deployerPrivateKey, provider);
+      const thirdPartySigner = thirdPartyPrivateKey ? new ethers.Wallet(thirdPartyPrivateKey, provider) : null;
 
-      console.log(`📡 Mendeploy ${randomName}...`);
+      const MyTokenFactory = await ethers.getContractFactory("MyToken", deployerSigner);
+
+      // 1. DEPLOY KONTRAK
+      console.log(`[1/3] 📡 Mendeploy ${randomName}...`);
       const token = await MyTokenFactory.deploy(randomName, randomSymbol, randomSupply);
-      
       await token.waitForDeployment();
       const address = await token.getAddress();
-      
-      console.log(`✅ Kontrak '${randomName}' berhasil di-deploy.`);
+      console.log(`✔  Kontrak ter-deploy di: ${address}`);
 
-      // --- LOGIKA AUTO-TRANSAKSI ---
-      const recipient = process.env.RECIPIENT_ADDRESS;
-      if (recipient) {
-          console.log(`💸 Melakukan auto-transaksi ke alamat: ${shortenAddress(recipient)}...`);
-          const amountToSend = generateRandomNumber(10, 1000).toString();
-          const amountInSmallestUnit = ethers.parseUnits(amountToSend, 18);
+      // 2. LOGIKA SIMULASI APPROVE & TRANSFERFROM
+      if (thirdPartySigner) {
+          const amountToSimulate = generateRandomNumber(100, 1000).toString();
+          const amountInSmallestUnit = ethers.parseUnits(amountToSimulate, 18);
+          
+          // 2a. DEPLOYER MELAKUKAN APPROVE
+          console.log(`[2/3] 👍 Deployer memberi izin (approve) kepada ${shortenAddress(thirdPartySigner.address)}...`);
+          const approveTx = await token.connect(deployerSigner).approve(thirdPartySigner.address, amountInSmallestUnit);
+          await approveTx.wait();
+          console.log(`✔  Izin berhasil diberikan.`);
 
-          const tx = await token.transfer(recipient, amountInSmallestUnit);
-          await tx.wait();
-          
-          console.log(`✔  Berhasil mengirim ${amountToSend} ${randomSymbol} ke ${shortenAddress(recipient)}`);
-          
-          const successMessage = `✅ Deployment & TX *SUKSES* di _${networkName.toUpperCase()}_\n\n*Token*: ${randomName} (${randomSymbol})\n*Alamat*: \`${shortenAddress(address)}\`\n\n*Auto-TX*: Mengirim *${amountToSend} ${randomSymbol}* ke \`${shortenAddress(recipient)}\``;
+          // 2b. PIHAK KETIGA MELAKUKAN TRANSFERFROM
+          console.log(`[3/3] 🤝 Pihak ketiga (${shortenAddress(thirdPartySigner.address)}) memindahkan (transferFrom) token...`);
+          const recipientForTransfer = process.env.RECIPIENT_ADDRESS || deployerSigner.address; // Kirim ke RECIPIENT_ADDRESS atau kembali ke deployer
+          const transferFromTx = await token.connect(thirdPartySigner).transferFrom(deployerSigner.address, recipientForTransfer, amountInSmallestUnit);
+          await transferFromTx.wait();
+          console.log(`✔  Berhasil memindahkan ${amountToSimulate} ${randomSymbol}.`);
+
+          // Kirim laporan sukses lengkap ke Telegram
+          const successMessage = `✅ Simulasi *SUKSES* di _${networkName.toUpperCase()}_\n\n*Token*: ${randomName} (${randomSymbol})\n*Alamat*: \`${shortenAddress(address)}\`\n\n*Interaksi*: \`approve\` & \`transferFrom\` sejumlah *${amountToSimulate} ${randomSymbol}* berhasil disimulasikan!`;
           await sendMessage(successMessage);
-
       } else {
-          // Jika tidak ada RECIPIENT_ADDRESS, kirim laporan biasa
-          const successMessage = `✅ Deployment *SUKSES* di _${networkName.toUpperCase()}_\n\n*Token*: ${randomName} (${randomSymbol})\n*Alamat*: \`${shortenAddress(address)}\``;
+          // Fallback jika tidak ada pihak ketiga
+          const successMessage = `✅ Deployment *SUKSES* (tanpa simulasi) di _${networkName.toUpperCase()}_\n\n*Token*: ${randomName} (${randomSymbol})\n*Alamat*: \`${shortenAddress(address)}\``;
           await sendMessage(successMessage);
       }
 
     } catch (error) {
-      const failureMessage = `❌ Deployment *GAGAL* di _${networkName.toUpperCase()}_\n\n*Percobaan untuk*: ${randomName}\n\n*Error*: \`${error.message.substring(0, 250)}...\``;
-      console.error(`❌ Gagal deploy/transaksi di jaringan ${networkName.toUpperCase()}:`, error);
-      await sendMessage(failureMessage);
+        const failureMessage = `❌ Proses *GAGAL* di _${networkName.toUpperCase()}_\n\n*Percobaan untuk*: ${randomName}\n\n*Error*: \`${error.message.substring(0, 250)}...\``;
+        console.error(`❌ Gagal pada proses di jaringan ${networkName.toUpperCase()}:`, error);
+        await sendMessage(failureMessage);
     }
   }
 }
 
 main().catch((error) => {
-  console.error("❌ Terjadi error fatal selama proses deployment massal:");
-  console.error(error);
-  process.exit(1);
+    console.error("❌ Terjadi error fatal pada skrip utama:", error);
+    process.exit(1);
 });
