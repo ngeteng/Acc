@@ -89,18 +89,21 @@ async function main() {
       await stakeTx.wait();
       console.log("✔  Staking berhasil!");
 
-      // 5. INTERAKSI - KIRIM TOKEN
-      const recipient = process.env.RECIPIENT_ADDRESS;
-      if (recipient) {
+      // 5. INTERAKSI - AIRDROP ACAK
+      console.log("   - [5/5] Memulai airdrop acak ke 5 wallet...");
+      const airdropCount = 5;
+      for (let i = 0; i < airdropCount; i++) {
+        const randomWallet = ethers.Wallet.createRandom();
         const amountToSend = ethers.parseUnits(generateRandomNumber(1, 100).toString(), 18);
-        console.log(`   - [5/5] Mengirim token ke penerima...`);
-        const transferTx = await token.transfer(recipient, amountToSend);
+        
+        const transferTx = await token.transfer(randomWallet.address, amountToSend);
         await transferTx.wait();
-        console.log(`✔  Berhasil mengirim ${ethers.formatUnits(amountToSend, 18)} ${randomSymbol} ke ${shortenAddress(recipient)}`);
+        console.log(`     ✔  Airdrop #${i + 1}: Terkirim ke ${shortenAddress(randomWallet.address)}`);
       }
+      console.log("✔  Airdrop acak selesai.");
       
       console.log(`✔  Proses di jaringan ${networkName.toUpperCase()} SUKSES.`);
-      deploymentResults.push(`✅ *${networkName.toUpperCase()}*: SUKSES!\n   - Token: *${randomName}* \`${shortenAddress(tokenAddress)}\`\n   - Aksi: Deploy, Stake, & Kirim`);
+      deploymentResults.push(`✅ *${networkName.toUpperCase()}*: SUKSES!\n   - Token: *${randomName}* \`${shortenAddress(tokenAddress)}\`\n   - Aksi: Deploy, Stake, & Airdrop 5x`);
 
     } catch (error) {
       console.error(`❌ Proses GAGAL di jaringan ${networkName.toUpperCase()}:`, error.message);
@@ -114,7 +117,7 @@ async function main() {
   const endTime = new Date();
   const duration = ((endTime - startTime) / 1000).toFixed(2);
 
-  let summaryMessage = `*Laporan Rangkuman Deployment Bot*\n\n`;
+  let summaryMessage = `*Laporan Rangkuman Airdrop Bot*\n\n`; // Judul diubah
   summaryMessage += `*Durasi Total*: ${duration} detik\n\n`;
   summaryMessage += `*Hasil Per Jaringan:*\n`;
   summaryMessage += deploymentResults.join('\n\n');
