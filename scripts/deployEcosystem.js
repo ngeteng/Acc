@@ -5,7 +5,7 @@ const { sendMessage } = require('./telegramReporter.js');
 // =============================================================
 // KONFIGURASI
 // =============================================================
-const targetNetworks = ["Pharos", "Somnia", "OG"];
+const targetNetworks = ["Monad", "Pharos", "Somnia", "OG"];
 
 // =============================================================
 // FUNGSI HELPER
