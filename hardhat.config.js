@@ -5,6 +5,13 @@ require("dotenv").config();
 module.exports = {
   solidity: "0.8.20",
   networks: {
+
+    Monad: {
+      url: process.env.MND_RPC_URL || "",
+      accounts:
+        process.env.PRIVATE_KEY !== undefined ? [process.env.PRIVATE_KEY] : [],
+      chainId: 10143
+    },
     Pharos: {
       url: process.env.PHRS_RPC_URL || "",
       accounts:
