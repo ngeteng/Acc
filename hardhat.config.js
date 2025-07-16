@@ -10,7 +10,7 @@ module.exports = {
       url: process.env.XOS_RPC_URL || "",
       accounts:
         process.env.PRIVATE_KEY !== undefined ? [process.env.PRIVATE_KEY] : [],
-      chainId: 10143
+      chainId: 1267
     },
     Pharos: {
       url: process.env.PHRS_RPC_URL || "",
