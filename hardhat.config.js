@@ -12,6 +12,12 @@ module.exports = {
         process.env.PRIVATE_KEY !== undefined ? [process.env.PRIVATE_KEY] : [],
       chainId: 1267
     },
+    Monad: {
+      url: process.env.MND_RPC_URL || "",
+      accounts:
+        process.env.PRIVATE_KEY !== undefined ? [process.env.PRIVATE_KEY] : [],
+      chainId: 10143
+    },
     Pharos: {
       url: process.env.PHRS_RPC_URL || "",
       accounts:
